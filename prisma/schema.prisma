@@ -1,0 +1,39 @@
+// Schema portável: hoje aponta para SQLite (zero setup local).
+// Em produção (Vercel), trocar provider = "postgresql" e DATABASE_URL —
+// nenhum model usa recursos exclusivos do SQLite.
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id           String   @id @default(cuid())
+  name         String
+  email        String   @unique
+  passwordHash String
+  role         String   @default("ADMIN") // ADMIN
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+}
+
+model Materia {
+  id          String   @id @default(cuid())
+  secao       String   // ALERTA | CIDADE | UTILIDADE
+  tag         String?
+  titulo      String
+  resumo      String
+  corpo       String?
+  imagemUrl   String?
+  link        String?
+  destaque    Boolean  @default(false)
+  status      String   @default("PUBLICADO") // PUBLICADO | RASCUNHO
+  publicadoEm DateTime @default(now())
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
