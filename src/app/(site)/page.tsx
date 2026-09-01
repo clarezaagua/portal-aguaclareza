@@ -2,6 +2,7 @@ import Link from "next/link";
 import Image from "next/image";
 import { prisma } from "@/lib/prisma";
 import { WeatherWidget } from "./WeatherWidget";
+import { getNoticiasExternas, type NoticiaExterna } from "@/lib/externalNews";
 import type { Materia } from "@prisma/client";
 
 function Ripple() {
@@ -89,15 +90,45 @@ function CardLight({ m }: { m: Materia }) {
   );
 }
 
+function CardExterna({ n }: { n: NoticiaExterna }) {
+  return (
+    <a className="card" href={n.link} target="_blank" rel="noopener noreferrer">
+      <span className="meta">via {n.fonte}</span>
+      <h3>{n.titulo}</h3>
+      <p>{n.resumo}</p>
+    </a>
+  );
+}
+
+type CidadeItem =
+  | { kind: "propria"; data: Materia; data_hora: number }
+  | { kind: "externa"; data: NoticiaExterna; data_hora: number };
+
 export default async function HomePage() {
-  const materias = await prisma.materia.findMany({
-    where: { status: "PUBLICADO" },
-    orderBy: { publicadoEm: "desc" },
-  });
+  const [materias, noticiasExternas] = await Promise.all([
+    prisma.materia.findMany({
+      where: { status: "PUBLICADO" },
+      orderBy: { publicadoEm: "desc" },
+    }),
+    getNoticiasExternas(),
+  ]);
 
   const alerta = materias.filter((m) => m.secao === "ALERTA");
-  const cidade = materias.filter((m) => m.secao === "CIDADE");
+  const cidadePropria = materias.filter((m) => m.secao === "CIDADE");
   const utilidade = materias.filter((m) => m.secao === "UTILIDADE");
+
+  const cidade: CidadeItem[] = [
+    ...cidadePropria.map((m) => ({
+      kind: "propria" as const,
+      data: m,
+      data_hora: new Date(m.publicadoEm).getTime(),
+    })),
+    ...noticiasExternas.map((n) => ({
+      kind: "externa" as const,
+      data: n,
+      data_hora: n.data ? new Date(n.data).getTime() : 0,
+    })),
+  ].sort((a, b) => b.data_hora - a.data_hora);
 
   return (
     <>
@@ -175,14 +206,20 @@ export default async function HomePage() {
             <div>
               <span className="label">Acontece aqui</span>
               <h2>Cidade &amp; Região</h2>
-              <p>O dia a dia de Água Clara e dos municípios vizinhos.</p>
+              <p>O dia a dia de Água Clara e dos municípios vizinhos, com matérias próprias e destaques de outros veículos de MS.</p>
             </div>
           </div>
           <div className="grid2">
             {cidade.length === 0 ? (
               <div className="empty">Nenhuma notícia publicada ainda.</div>
             ) : (
-              cidade.map((m) => <CardLight key={m.id} m={m} />)
+              cidade.map((item) =>
+                item.kind === "propria" ? (
+                  <CardLight key={item.data.id} m={item.data} />
+                ) : (
+                  <CardExterna key={item.data.link} n={item.data} />
+                )
+              )
             )}
           </div>
         </div>
